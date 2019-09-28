@@ -15,15 +15,11 @@ class TokenVerification
      */
     public function handle($request, Closure $next)
     {
-        if($request->ajax()){
-            if( $request->token != $_SESSION['token'] ){
-                $output = ['status' =>'success','status_code'=>401,'message'=>'Security Token is Not Match','data' => null];
-                return response()->json($output);
-            }else{
-                return $next($request);
-            }   
+        if( !isset($request->token) || $request->token != $_SESSION['token'] ){
+            $output = ['status' =>'success','status_code'=>401,'message'=>'Security Token is Not Match','data' => null];
+            return response()->json($output);
         }else{
-            abort(404);
+            return $next($request);
         }
              
     }
