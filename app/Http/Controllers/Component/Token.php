@@ -1,7 +1,7 @@
 <?php
 namespace App\Http\Controllers\Component;
 
-use Session;
+use Illuminate\Support\Facades\Session;
 use Illuminate\Support\Str;
 
 trait Token
@@ -11,6 +11,7 @@ trait Token
     
     protected function generateAccessToken(){
         $this->access_token = Str::random(30);
+        //Session::put('token',$this->access_token);
         $_SESSION['token'] = $this->access_token;
     }
 

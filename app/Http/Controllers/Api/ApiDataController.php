@@ -34,6 +34,7 @@ class ApiDataController extends Controller
         }
     }
 
+    /*
     public function getSalonDetails($salon_id){
         try{
             $salonDetails = DB::table('salon_setup as ST')
@@ -48,6 +49,32 @@ class ApiDataController extends Controller
                 $salon->treatment_picture = base64_encode($salon->treatment_picture);
                 $salon->branding_picture1 = base64_encode($salon->branding_picture1);
             }
+            $output = ['status' => 'success','status_code'=>200,'message'=> null, 'token' => $this->get_access_token(), 'data' => $salonDetails];
+            return response()->json( $output);
+        }catch(Exception $ex){
+            $output = [
+                'status' => 'error','status_code'=>500,'message'=> 'Something went Wrong. Try again Later', 
+                'token' => $this->get_access_token(),'data' => null
+            ];
+            return response()->json( $output);
+        }
+    }
+	*/
+
+    public function getSalonDetails($salon_id){
+        try{
+            $salonDetails = DB::table('salon_setup as ST')
+                ->leftjoin('salon_registration as SR','SR.id','=','ST.salon_register_id')
+                ->where('ST.id','=',$salon_id)
+                ->select('ST.salon_register_id','ST.id as salon_setup_id','ST.contact_details','ST.city','ST.state','ST.postal_code','ST.opening_days_hours','ST.opening_time','ST.closing_time',
+                'SR.phone_number','SR.email','SR.full_name as salon_name','ST.branding_picture1')
+                ->first();
+            $salonDetails->branding_picture1 = base64_encode($salonDetails->branding_picture1);
+            $treatmentList = DB::select("Select treatment_list.id,treatment_list.salon_id,treatment_list.salon_name,treatment_list.treatment_name,treatment_list.treatment_description,treatment_list.treatment_duration,treatment_list.unsuitable_for,treatment_list.patch_test,treatment_list.treatment_price,treatment_list.brand_treatment,treatment_list.price_offer_courses,salon_setup.salon_logo from treatment_list INNER JOIN salon_setup ON salon_setup.salon_register_id =treatment_list.salon_id where salon_id=".$salon_id);
+            foreach($treatmentList as $list){
+                $list->salon_logo = base64_encode( $list->salon_logo);
+            }
+            $salonDetails->treatment_list = $treatmentList;
             $output = ['status' => 'success','status_code'=>200,'message'=> null, 'token' => $this->get_access_token(), 'data' => $salonDetails];
             return response()->json( $output);
         }catch(Exception $ex){

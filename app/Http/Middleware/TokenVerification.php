@@ -3,6 +3,7 @@
 namespace App\Http\Middleware;
 
 use Closure;
+use Illuminate\Support\Facades\Session;
 
 class TokenVerification
 {
@@ -21,6 +22,12 @@ class TokenVerification
         }else{
             return $next($request);
         }
+        // if( !isset($request->token) || $request->token != Session::get('token') ){
+        //     $output = ['status' =>'success','status_code'=>401,'message'=>'Security Token is Not Match','data' => null];
+        //     return response()->json($output);
+        // }else{
+        //     return $next($request);
+        // }
              
     }
 }
