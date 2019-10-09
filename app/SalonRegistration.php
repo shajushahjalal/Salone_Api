@@ -8,4 +8,5 @@ class SalonRegistration extends Model
 {
     //
     protected $table = "salon_registration";
+    public $timestamps = false;
 }

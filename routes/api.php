@@ -17,10 +17,38 @@ use Illuminate\Http\Request;
 //     return $request->user();
 // });
 
+/**
+ * Authentication Token
+ * After Verify APP Key
+*/ 
 Route::get('get_token','Api\TokenController@getToken');
 
-Route::middleware(['TokenVerification'])->group(function(){
-    Route::post('get/appointment','Api\TokenController@getAppointment');
-    Route::post('get/all_salons','Api\ApiDataController@getAllSelon');
-    Route::post('get/{salon_id}/salons_details','Api\ApiDataController@getSalonDetails');
-});
+
+    //Route::post('get/appointment','Api\TokenController@getAppointment');
+
+    /**
+     * Salone List &
+     * Salone Details
+     */
+    Route::post('get/all_salons','Api\SaloneController@getAllSelon');
+    Route::get('get/salons_details','Api\SaloneController@requestSalonDetailsPrams');
+    Route::post('get/salons_details','Api\SaloneController@getSalonDetails');
+
+    /**
+     * Customer Registration &
+     *  Login
+     */
+    Route::get('customer/login','Api\CustomerController@requestLoginPrams');    
+    Route::post('customer/login','Api\CustomerController@login');
+
+    Route::post('customer/register','Api\CustomerController@store');
+
+    /**
+     * Appointment 
+     */
+    Route::get('appointment','Api\AppointmentController@getPerameter');
+    Route::post('appointment','Api\AppointmentController@appointment');
+    Route::post('appointment/select-therapist','Api\AppointmentController@selectTheratist');
+    Route::post('appointment/select-date','Api\AppointmentController@selectDate');
+    Route::get('appointment/confirm','Api\AppointmentController@confirmAppointmentPrams');
+    Route::post('appointment/confirm','Api\AppointmentController@confirmAppointment');

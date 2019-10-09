@@ -19,9 +19,9 @@ class TokenController extends Controller
         return response()->json( $output);
     }
 
-    public function getAppointment(Request $request){
-        $data['data'] = Appointment::all();
-        $output = ['status' => 'success','status_code'=>200,'message'=> null, 'token' => $this->get_access_token(), 'data' => $data];
-        return response()->json( $output);
-    }
+    // public function getAppointment(Request $request){
+    //     $data['data'] = Appointment::all();
+    //     $output = ['status' => 'success','status_code'=>200,'message'=> null, 'token' => $this->get_access_token(), 'data' => $data];
+    //     return response()->json( $output);
+    // }
 }

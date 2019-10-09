@@ -6,11 +6,11 @@ use Illuminate\Support\Str;
 
 trait Token
 {
-    protected $access_token;
     protected $next_access_token;
+    protected $access_token = "SHTUARSVEUNAHLIAOLYAJOL";
     
     protected function generateAccessToken(){
-        $this->access_token = Str::random(30);
+        //$this->access_token = Str::random(30);
         //Session::put('token',$this->access_token);
         $_SESSION['token'] = $this->access_token;
     }
@@ -26,10 +26,17 @@ trait Token
         return $this->access_token;
     }
 
-    protected function verifyToken($request){
-        if( $request->token != $_SESSION['token'] ){
-            $output = ['status' =>'success','status_code'=>401,'message'=>'Security Token is Not Match','data' => null];
-            return response()->json($output);
+    protected function verifyToken($token){
+        if( $token == $this->access_token ){
+            return true;            
+        }else{
+            return false;
         }
     }
+
+    protected function verifyFailed(){
+        $output = ['status' =>'success','status_type' => false,'status_code'=>401,'message'=>'Security Token is Not Match','data' => null];
+        return response()->json($output);
+    }
+
 }
