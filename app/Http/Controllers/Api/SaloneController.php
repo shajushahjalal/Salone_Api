@@ -9,7 +9,10 @@ use Illuminate\Support\Facades\DB;
 
 class SaloneController extends Controller
 {
-    // Get All Selon Data
+    /**
+     * Get All 
+     * Salon List
+     */
     public function getAllSelon(Request $request){
         if( !$this->verifyToken($request->token) ){
             return $this->verifyFailed();
@@ -40,7 +43,10 @@ class SaloneController extends Controller
         }
     }
 
-    // Salon Details parms
+    /**
+     * For Get Salon Details 
+     * Required parms
+     */ 
     public function requestSalonDetailsPrams(Request $request){
         if( !$this->verifyToken($request->token) ){
             return $this->verifyFailed();
@@ -50,8 +56,12 @@ class SaloneController extends Controller
         return response()->json( $output);
     }
 
-    // Get Salone Details
+    /** 
+     * Get Salone Details
+     * Information
+     */ 
     public function getSalonDetails(Request $request){
+
         if( !$this->verifyToken($request->token) ){
             return $this->verifyFailed();
         }
@@ -73,8 +83,35 @@ class SaloneController extends Controller
             return response()->json( $output);
         }catch(Exception $ex){
             $output = [
-                'status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went Wrong. Try again Later', 'data' => null
-            ];
+                'status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went Wrong. Try again Later', 'data' => null];
+            return response()->json( $output);
+        }
+    }
+
+    /**
+     * Search Salon
+     */
+    public function searchSalon(Request $request){
+        try{
+            if( !$this->verifyToken($request->token) ){
+                return $this->verifyFailed();
+            }
+            $data = DB::table('salon_registration as SR')
+                ->leftJoin('salon_setup as ST','ST.salon_register_id','SR.id')
+                ->where('SR.salon_status','=', 1)
+                ->where(function($query)use($request){
+                    $query->where('SR.full_name','like','%'.$request->search.'%')
+                    ->orWhere('ST.city','like','%'.$request->search.'%')                    
+                    ->orWhere('ST.postal_code','like','%'.$request->search.'%');                  
+                })
+                ->select('SR.id as salon_register_id','SR.full_name','SR.phone_number','ST.contact_details','ST.city','ST.state',
+                'ST.postal_code','salon_setup.id as salon_id')->get();
+            
+            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> null, 'data' => $data];
+            return response()->json( $output);
+
+        }catch(Exception $e){
+            $output = ['status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went Wrong. Try again Later', 'data' => null];
             return response()->json( $output);
         }
     }

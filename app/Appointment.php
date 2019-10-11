@@ -10,4 +10,12 @@ class Appointment extends Model
     public $timestamps = false;
     protected $casts = ['create_date' => 'dateTime'];
 
+    // public function treatment(){
+    //     return $this->belongsTo(TreatmentList::class,'treatment_id','id');
+    // }
+
+    // public function customer(){
+    //     return $this->belongsTo(CustomerRegistration::class,'client_id','id');
+    // }
+
 }

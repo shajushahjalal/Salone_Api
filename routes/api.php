@@ -21,10 +21,7 @@ use Illuminate\Http\Request;
  * Authentication Token
  * After Verify APP Key
 */ 
-Route::get('get_token','Api\TokenController@getToken');
-
-
-    //Route::post('get/appointment','Api\TokenController@getAppointment');
+    Route::get('get_token','Api\TokenController@getToken');
 
     /**
      * Salone List &
@@ -34,14 +31,20 @@ Route::get('get_token','Api\TokenController@getToken');
     Route::get('get/salons_details','Api\SaloneController@requestSalonDetailsPrams');
     Route::post('get/salons_details','Api\SaloneController@getSalonDetails');
 
+    Route::get('search-salon','Api\SaloneController@searchSalon');
+    Route::post('search-salon','Api\SaloneController@searchSalon');
+
     /**
      * Customer Registration &
      *  Login
      */
     Route::get('customer/login','Api\CustomerController@requestLoginPrams');    
     Route::post('customer/login','Api\CustomerController@login');
-
+    Route::get('customer/register','Api\CustomerController@create');
     Route::post('customer/register','Api\CustomerController@store');
+    Route::post('customer/update','Api\CustomerController@update');
+    Route::post('customer/password-update','Api\CustomerController@updatePassword');
+    Route::post('customer/forgot-password','Api\CustomerController@forgotPassword');
 
     /**
      * Appointment 
@@ -52,3 +55,6 @@ Route::get('get_token','Api\TokenController@getToken');
     Route::post('appointment/select-date','Api\AppointmentController@selectDate');
     Route::get('appointment/confirm','Api\AppointmentController@confirmAppointmentPrams');
     Route::post('appointment/confirm','Api\AppointmentController@confirmAppointment');
+    Route::post('appointment/load','Api\AppointmentController@loadAppoinement');
+    Route::post('appointment/history','Api\AppointmentController@appoinementHistory');
+    Route::post('appointment/cancel','Api\AppointmentController@cancelAppointment');

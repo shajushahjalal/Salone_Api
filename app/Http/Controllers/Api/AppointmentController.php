@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Appointment;
+use App\CustomerRegistration;
 use Illuminate\Http\Request;
 use App\Http\Controllers\Controller;
 use App\SalonRegistration;
@@ -13,7 +14,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Mail;
+use Mail;
 
 class AppointmentController extends Controller
 {
@@ -22,7 +23,6 @@ class AppointmentController extends Controller
         if( !$this->verifyToken($request->token) ){
             return $this->verifyFailed();
         }
-
         $data = ['salon_id' => "", 'treatment_id' => ''];
         $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> '','token' => 'Give here the Security Token' ,'data' => $data];
         return response()->json($output);
@@ -209,10 +209,6 @@ class AppointmentController extends Controller
                 return $this->verifyFailed();
             }
 
-            if( !$this->isLogin() ){
-                return $this->notLogin();
-            }
-
             // Validate the data
             $validator = Validator::make($request->data,[
                 'salon_id' => ['required','numeric','min:1'],
@@ -231,11 +227,12 @@ class AppointmentController extends Controller
             // Save Appointment Data
             $appointment = new Appointment();
             $selon_setup = SalonSetup::findOrFail($request->data['salon_id']);
+            $customer = CustomerRegistration::findOrFail($request->data['user_id']);
             $this->makeAppoinrment($appointment, $request->data);
-            $this->updateBookingStatus($request->data,$selon_setup);
+            $this->updateBookingStatus($request->data,$selon_setup,$customer);
             DB::commit();
-            $this->sendConfirmationMail($request->data['salon_id'], $request->data);
-            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> 'Your Appointment Confirm Successfully' ,'data' => $_SESSION['customer']];
+            $this->sendConfirmationMail($request->data['salon_id'], $request->data, $customer);
+            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> 'Your Appointment Confirm Successfully' ,'data' => null];
             return response()->json($output); 
 
         }catch(Exception $ex){
@@ -261,27 +258,27 @@ class AppointmentController extends Controller
     }
 
     // Update Appointment Bookng Status
-    protected function updateBookingStatus($data, $salon_setup){
+    protected function updateBookingStatus($data, $salon_setup, $customer){        
         TimeSchedule::where('therapist_id', $data['therapist_id'] )
             ->where('slot_time', $data['timeslot'] )
             ->where('slot_date', $data['date'] )
             ->where('salon_register_id',$salon_setup->salon_register_id)
-            ->update(['flag' => 'B','modified_date' => Carbon::now(), 'modified_by' => $_SESSION['customer']->email ]);
+            ->update(['flag' => 'B','modified_date' => Carbon::now(), 'modified_by' => $customer->id ]);
     }
 
     // Send Appointment Confirmation Mail
-    protected function sendConfirmationMail($salon_id, $data){
-        $salon_register = SalonRegistration::where('salon_register_id', $salon_id)
+    protected function sendConfirmationMail($salon_id, $data,$customer){
+        $salon_register = SalonRegistration::where('salon_register_id','=',$salon_id)
             ->select('id','email','phone_number','full_name')->get();
         $treatment = TreatmentList::findorFail($data['treatment_id']);
         
-        $customer_message = 'Hi '.$_SESSION['customer']->full_name.'<br>'.
+        $customer_message = 'Hi '.$customer->full_name.'<br>'.
         'Thank you for booking a '.$treatment->treatment_name .' on '.$data['date'].' at '.$data['timeslot'].'.It\'s been confirmed. Thank You!';
 
-        $this->sendMail($_SESSION['customer']->email, $customer_message);
+        $this->sendMail($customer->email, $customer_message);
         
         foreach($salon_register as $salon_reg){
-            $salon_message = "Hi ".$salon_register->full_name.' Your customer '. $_SESSION['customer']->full_name.' booked an appointment '.$treatment->treatment_name.
+            $salon_message = "Hi ".$salon_reg->full_name.' Your customer '. $customer->full_name.' booked an appointment '.$treatment->treatment_name.
             ' on '.$data['date'].' at '.$data['timeslot'].'. It\'s been confirmed. Thank You!';
             $this->sendMail($salon_reg->email,$salon_message);
         }        
@@ -298,5 +295,131 @@ class AppointmentController extends Controller
               ->subject('Appointment Confirmation');
             $message->from('support@salonregister.com');
         });
+    }
+
+
+    /**
+     * Load Appointments
+     */
+    public function loadAppoinement(Request $request){
+        try{
+            if( !$this->verifyToken($request->token) ){
+                return $this->verifyFailed();
+            }
+            // Validate the data
+            $validator = Validator::make($request->data,[
+                'user_id' => ['required','numeric','min:1'],
+            ]);
+            
+            //check validation
+            if( $validator->fails() ){
+                $output = ['status' => 'error','status_type' => false,'status_code'=>400,'message'=> $validator->errors()->first() ,'data' => null];
+                return response()->json($output);            
+            }
+            $data = $this->getAllAppointment( $request->data['user_id'],isset($request->data['date'])?$request->data['date']:null, isset($request->data['to_date'])?$request->data['to_date']:null, isset($request->data['from_date'])?$request->data['from_date']:null );
+    
+            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> '' ,'data' => $data];
+            return response()->json($output); 
+
+        }catch(Exception $ex){
+            $output = ['status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went wrong' ,'data' => null];
+            return response()->json($output); 
+        }
+        
+    }
+
+    /**
+     * Load Appointment History
+     * Load All Appointments
+     */
+    public function appoinementHistory(Request $request){
+        try{
+            if( !$this->verifyToken($request->token) ){
+                return $this->verifyFailed();
+            }
+            // Validate the data
+            $validator = Validator::make($request->data,[
+                'user_id' => ['required','numeric','min:1'],
+            ]);
+            
+            //check validation
+            if( $validator->fails() ){
+                $output = ['status' => 'error','status_type' => false,'status_code'=>400,'message'=> $validator->errors()->first() ,'data' => null];
+                return response()->json($output);            
+            }
+
+            
+        $data = $this->getAllAppointment( $request->data['user_id']);
+            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> '' ,'data' => $data];
+            return response()->json($output); 
+
+        }catch(Exception $ex){
+            $output = ['status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went wrong' ,'data' => null];
+            return response()->json($output); 
+        }
+    }
+
+    // Get All Appointment Data
+    protected function getAllAppointment($customer_id,$date = null, $to_date = null, $form_date = null){
+        //dd( $to_date,$form_date);
+        $query = DB::table('appointment as APT')
+            ->leftjoin('customer_registration as CR','CR.id','=','APT.client_id')
+            ->leftjoin('treatment_list as TL','TL.id','=','APT.treatment_id')
+            ->where('CR.id','=', $customer_id)->where('APT.status',1);
+        if( !empty($to_date) && !empty($form_date) ){
+            if($to_date < $form_date){
+                $query->whereBetween('APT.appointment_date',[$to_date, $form_date]);
+            }else{
+                $query->whereBetween('APT.appointment_date',[$form_date,$to_date]);
+            }            
+        }elseif(!empty($date)){
+            $query->where('APT.appointment_date', '>=', $date);
+        }
+        else{
+            $query->where('APT.appointment_date', '<', Carbon::now()->format('Y-m-d'));
+        }
+
+        $data = $query->select('APT.id as appointment_id','APT.therapist_name','APT.status','APT.time_schedule_id',
+            'TL.treatment_name','APT.appointment_date','appointment_time','APT.client_id as customer_id',
+            'CR.full_name','CR.email','CR.phone','CR.contact_details','CR.city','CR.postal_code','APT.salon_id',
+            'APT.status','APT.create_date')->orderBy('appointment_id','DESC')->get();
+        return $data;
+    }
+
+    /**
+     * Cancel Appointment
+     */
+    public function cancelAppointment(Request $request){ 
+        try{
+            if( !$this->verifyToken($request->token) ){
+                return $this->verifyFailed();
+            }
+            // Validate the data
+            $validator = Validator::make($request->data,[
+                'user_id' => ['required','numeric','min:1'],
+                'appointment_id' =>  ['required','numeric','min:1'],
+            ]);
+            
+            //check validation
+            if( $validator->fails() ){
+                $output = ['status' => 'error','status_type' => false,'status_code'=>400,'message'=> $validator->errors()->first() ,'data' => null];
+                return response()->json($output);            
+            }
+            DB::beginTransaction();
+
+            $appointment = Appointment::find($request->data['appointment_id']);
+            $appointment->status = '0';
+            $appointment->save();
+            TimeSchedule::where('therapist_id', '=' ,$appointment->therapist_id)
+                ->where('slot_date', '=', $appointment->appointment_date)
+                ->where('slot_time','=', $appointment->appointment_time)
+                ->update(['flag' => 'A','modified_date' => Carbon::now(), 'modified_by' => $request->data['user_id'] ]);
+            DB::commit();
+            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> 'Appointment Cancel Successfully' ,'data' => null];
+            return response()->json($output);
+        }catch(Exception $e){
+            $output = ['status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went wrong' ,'data' => null];
+            return response()->json($output);
+        }
     }
 }
