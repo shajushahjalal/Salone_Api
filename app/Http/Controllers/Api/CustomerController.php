@@ -162,7 +162,7 @@ class CustomerController extends Controller
             }
 
         }catch(Exception $e){
-            $output = ['status' => 'error','status_code'=>500,'status_type' => true, 'message'=> 'Something went wrong','data' => null];
+            $output = ['status' => 'error','status_code'=>500,'status_type' => true, 'message'=> 'Something went wrong'.$e->getMessage(),'data' => null];
             return response()->json( $output);
         }        
     }

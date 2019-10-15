@@ -362,6 +362,16 @@ class AppointmentController extends Controller
     // Get All Appointment Data
     protected function getAllAppointment($customer_id,$date = null, $to_date = null, $form_date = null){
         //dd( $to_date,$form_date);
+        if(!empty($date)){
+            $date = Carbon::parse($date)->format('Y-m-d');
+        }
+        if( !empty($to_date) ){
+            $to_date = Carbon::parse($to_date)->format('Y-m-d');
+        }
+        if( !empty($form_date) ){
+            $form_date = Carbon::parse($form_date)->format('Y-m-d');
+        }
+
         $query = DB::table('appointment as APT')
             ->leftjoin('customer_registration as CR','CR.id','=','APT.client_id')
             ->leftjoin('treatment_list as TL','TL.id','=','APT.treatment_id')
@@ -382,7 +392,10 @@ class AppointmentController extends Controller
         $data = $query->select('APT.id as appointment_id','APT.therapist_name','APT.status','APT.time_schedule_id',
             'TL.treatment_name','APT.appointment_date','appointment_time','APT.client_id as customer_id',
             'CR.full_name','CR.email','CR.phone','CR.contact_details','CR.city','CR.postal_code','APT.salon_id',
-            'APT.status','APT.create_date')->orderBy('appointment_id','DESC')->get();
+            'APT.status','APT.create_date','TL.treatment_picture_path')->orderBy('appointment_id','DESC')->get();
+        foreach($data as $item){
+            $item->treatment_picture_path = str_replace('~','',$item->treatment_picture_path);
+        }
         return $data;
     }
 
