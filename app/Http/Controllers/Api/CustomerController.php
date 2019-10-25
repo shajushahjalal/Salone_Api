@@ -43,9 +43,9 @@ class CustomerController extends Controller
 
         $validate = Validator::make($request->data,[
             'email' => ['required','unique:customer_registration'],'full_name' => ['required'],
-            'middle_name' => ['required'],'last_name' =>['required'],'password' => ['required'],
+            'last_name' =>['required'],'password' => ['required'],'city' => ['required'],'state'=>['required'],
             'phone'=>['required','unique:customer_registration'], 'contact_details' => ['required'],
-            'state'=>['required'],'city' => ['required'],
+            
         ]);
         if( $validate->fails() ){
             $output = ['status' => 'error','status_code'=>401,'message'=> $validate->errors()->first(),'data' => null];
@@ -137,7 +137,7 @@ class CustomerController extends Controller
         }
 
         $validate = Validator::make($request->data,[
-            'user_id' => ['required','min:1'], 'full_name' => ['required'], 'middle_name' => ['required'], 'last_name' => ['required'],
+            'user_id' => ['required','min:1'], 'full_name' => ['required'], 'last_name' => ['required'],
             'phone'=>['required'], 'contact_details' => ['required'], 'state'=>['required'], 'city' => ['required']
         ]);
 
@@ -162,7 +162,7 @@ class CustomerController extends Controller
             }
 
         }catch(Exception $e){
-            $output = ['status' => 'error','status_code'=>500,'status_type' => true, 'message'=> 'Something went wrong'.$e->getMessage(),'data' => null];
+            $output = ['status' => 'error','status_code'=>500,'status_type' => false, 'message'=> 'Something went wrong'.$e->getMessage(),'data' => null];
             return response()->json( $output);
         }        
     }

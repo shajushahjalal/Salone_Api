@@ -58,3 +58,4 @@ use Illuminate\Http\Request;
     Route::post('appointment/load','Api\AppointmentController@loadAppoinement');
     Route::post('appointment/history','Api\AppointmentController@appoinementHistory');
     Route::post('appointment/cancel','Api\AppointmentController@cancelAppointment');
+    Route::post('appointment/change','Api\AppointmentController@changeAppointment');

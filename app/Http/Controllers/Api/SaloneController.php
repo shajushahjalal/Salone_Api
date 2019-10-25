@@ -102,8 +102,9 @@ class SaloneController extends Controller
                 ->where('SR.salon_status','=', 1)
                 ->where(function($query)use($request){
                     $query->where('SR.full_name','like','%'.$request->search.'%')
-                    ->orWhere('ST.city','like','%'.$request->search.'%')                    
-                    ->orWhere('ST.postal_code','like','%'.$request->search.'%');                  
+                    ->orWhere('ST.city','like','%'.$request->search.'%')
+                    ->orWhere('ST.state','like','%'.$request->search.'%')
+                    ->orWhere('ST.postal_code','like','%'.$request->search.'%');
                 })
                 ->select('ST.*','SR.full_name as salon_name','closing_day')->get();
             foreach($data as $salon){                
@@ -112,17 +113,7 @@ class SaloneController extends Controller
                 $salon->owner_picture = null;
                 $salon->branding_picture1 = null;
                 $salon->branding_picture2 = null;                           
-            } 
-            // $data = DB::table('salon_setup as ST')
-            //     ->leftJoin('salon_registration as SR','ST.salon_register_id','SR.id')
-            //     ->where('SR.salon_status','=', 1)
-            //     ->where(function($query)use($request){
-            //         $query->where('SR.full_name','like','%'.$request->search.'%')
-            //         ->orWhere('ST.city','like','%'.$request->search.'%')                    
-            //         ->orWhere('ST.postal_code','like','%'.$request->search.'%');                  
-            //     })
-            //     ->select('SR.id as salon_register_id','SR.full_name','SR.phone_number','ST.contact_details','ST.city','ST.state',
-            //     'ST.postal_code','ST.id as salon_id')->get();
+            }
             
             $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> null, 'data' => $data];
             return response()->json( $output);

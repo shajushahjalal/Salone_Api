@@ -35,7 +35,7 @@ trait Token
     }
 
     protected function verifyFailed(){
-        $output = ['status' =>'success','status_type' => false,'status_code'=>401,'message'=>'Security Token is Not Match','data' => null];
+        $output = ['status' =>'error','status_type' => false,'status_code'=>401,'message'=>'Security Token is Not Match','data' => null];
         return response()->json($output);
     }
 

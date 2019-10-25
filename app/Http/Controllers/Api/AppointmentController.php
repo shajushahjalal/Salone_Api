@@ -162,6 +162,7 @@ class AppointmentController extends Controller
      * Load Available Time Slot
      */
     protected function loadTimeSlot($selon_setup, $therapist_id, $date){
+        $date = Carbon::parse($date)->format('Y-m-d');
         if($therapist_id < 1 || empty($therapist_id) ){
             $data = DB::select("select T.therapist_id,T.flag,T.slot_date, UPPER(TRIM(DAYNAME(T.slot_date))) DAY_NAME , 
                 T.slot_time from time_schedule T WHERE T.slot_date='" .$date. "' and 
@@ -231,8 +232,13 @@ class AppointmentController extends Controller
             $this->makeAppoinrment($appointment, $request->data);
             $this->updateBookingStatus($request->data,$selon_setup,$customer);
             DB::commit();
-            $this->sendConfirmationMail($request->data['salon_id'], $request->data, $customer);
-            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> 'Your Appointment Confirm Successfully' ,'data' => null];
+            $message = "Your Appointment Confirm Successfully.";
+            try{
+                $this->sendConfirmationMail($request->data['salon_id'], $request->data, $customer,'Appointment Confirmation');
+            }catch(Exception $e){
+                $message .= ' But Mail is not sent due to server problem';
+            }
+            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> $message ,'data' => null];
             return response()->json($output); 
 
         }catch(Exception $ex){
@@ -246,7 +252,13 @@ class AppointmentController extends Controller
     protected function makeAppoinrment($appointment, $data){
         $appointment->client_id = $data['user_id'];
         $appointment->salon_id  = $data['salon_id'];
-        $appointment->therapist_name = isset($data['therapist_name'])? $data['therapist_name'] : null;
+        if(isset($data['therapist_name'])){
+            $appointment->therapist_name = $data['therapist_name'];
+        }else{
+            $datas = SalonRegistration::find($data['therapist_id']);
+            $appointment->therapist_name = $datas->first_name; 
+        }
+        
         $appointment->therapist_id = isset($data['therapist_id'])? $data['therapist_id'] : null;
         $appointment->treatment_id = $data['treatment_id'];
         $appointment->appointment_date = $data['date'];
@@ -267,7 +279,7 @@ class AppointmentController extends Controller
     }
 
     // Send Appointment Confirmation Mail
-    protected function sendConfirmationMail($salon_id, $data,$customer){
+    protected function sendConfirmationMail($salon_id, $data,$customer, $sublect){
         $salon_register = SalonRegistration::where('salon_register_id','=',$salon_id)
             ->select('id','email','phone_number','full_name')->get();
         $treatment = TreatmentList::findorFail($data['treatment_id']);
@@ -275,24 +287,24 @@ class AppointmentController extends Controller
         $customer_message = 'Hi '.$customer->full_name.'<br>'.
         'Thank you for booking a '.$treatment->treatment_name .' on '.$data['date'].' at '.$data['timeslot'].'.It\'s been confirmed. Thank You!';
 
-        $this->sendMail($customer->email, $customer_message);
+        $this->sendMail($customer->email, $customer_message, $sublect);
         
         foreach($salon_register as $salon_reg){
             $salon_message = "Hi ".$salon_reg->full_name.' Your customer '. $customer->full_name.' booked an appointment '.$treatment->treatment_name.
             ' on '.$data['date'].' at '.$data['timeslot'].'. It\'s been confirmed. Thank You!';
-            $this->sendMail($salon_reg->email,$salon_message);
+            $this->sendMail($salon_reg->email,$salon_message, $sublect);
         }        
     }
 
     // Send Mail to Customer
-    protected function sendMail($email,$message){
+    protected function sendMail($email,$message,$sublect){
         $receiver = [
             'customer_email' => $email,
             'messagebody' => $message
         ];
-        Mail::send('email.confirmAppointment',$receiver,function($message) use ($receiver){
+        Mail::send('email.confirmAppointment',$receiver,function($message) use ($receiver,$sublect){
             $message->to($receiver['customer_email'])
-              ->subject('Appointment Confirmation');
+              ->subject($sublect);
             $message->from('support@salonregister.com');
         });
     }
@@ -321,7 +333,7 @@ class AppointmentController extends Controller
             $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> '' ,'data' => $data];
             return response()->json($output); 
 
-        }catch(Exception $ex){
+        }catch(Exception $e){
             $output = ['status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went wrong' ,'data' => null];
             return response()->json($output); 
         }
@@ -349,7 +361,7 @@ class AppointmentController extends Controller
             }
 
             
-        $data = $this->getAllAppointment( $request->data['user_id']);
+            $data = $this->getAllAppointment( $request->data['user_id']);
             $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> '' ,'data' => $data];
             return response()->json($output); 
 
@@ -375,6 +387,8 @@ class AppointmentController extends Controller
         $query = DB::table('appointment as APT')
             ->leftjoin('customer_registration as CR','CR.id','=','APT.client_id')
             ->leftjoin('treatment_list as TL','TL.id','=','APT.treatment_id')
+            ->leftjoin('salon_setup as ST','ST.id','=','APT.salon_id')
+            ->leftjoin('salon_registration as SR','SR.id','=','ST.salon_register_id')
             ->where('CR.id','=', $customer_id)->where('APT.status',1);
         if( !empty($to_date) && !empty($form_date) ){
             if($to_date < $form_date){
@@ -386,13 +400,15 @@ class AppointmentController extends Controller
             $query->where('APT.appointment_date', '>=', $date);
         }
         else{
-            $query->where('APT.appointment_date', '<', Carbon::now()->format('Y-m-d'));
+            //$query->where('APT.appointment_date', '<', Carbon::now()->format('Y-m-d'));
         }
 
         $data = $query->select('APT.id as appointment_id','APT.therapist_name','APT.status','APT.time_schedule_id',
-            'TL.treatment_name','APT.appointment_date','appointment_time','APT.client_id as customer_id',
+            'TL.treatment_name','TL.id as treatment_id','APT.appointment_date','appointment_time','APT.client_id as customer_id',
             'CR.full_name','CR.email','CR.phone','CR.contact_details','CR.city','CR.postal_code','APT.salon_id',
-            'APT.status','APT.create_date','TL.treatment_picture_path')->orderBy('appointment_id','DESC')->get();
+            'APT.status','APT.create_date','TL.treatment_picture_path','SR.full_name as salon_name','SR.email as salon_email','SR.phone_number as salon_phone_number',
+            'ST.contact_details as salon_address','ST.city as salon_city','ST.state as salon_state','ST.postal_code as salon_postal_code')
+            ->orderBy('appointment_date','DESC')->get();
         foreach($data as $item){
             $item->treatment_picture_path = str_replace('~','',$item->treatment_picture_path);
         }
@@ -428,11 +444,120 @@ class AppointmentController extends Controller
                 ->where('slot_time','=', $appointment->appointment_time)
                 ->update(['flag' => 'A','modified_date' => Carbon::now(), 'modified_by' => $request->data['user_id'] ]);
             DB::commit();
-            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> 'Appointment Cancel Successfully' ,'data' => null];
+            $msssage = "Appointment Cancel Successfully.";
+
+            try{
+                $customer = CustomerRegistration::find($request->data['user_id']);
+                $this->sendCancelMail($appointment, $customer, 'Cancel Appointment');
+            }catch(Exception $e){
+                $msssage .= 'But mail is not sent';
+            }
+            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> $msssage ,'data' => null];
             return response()->json($output);
         }catch(Exception $e){
             $output = ['status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went wrong' ,'data' => null];
             return response()->json($output);
         }
+    }
+
+
+    /**
+     * Change Appointment
+     */
+    public function changeAppointment(Request $request){
+        try{
+            if( !$this->verifyToken($request->token) ){
+                return $this->verifyFailed();
+            }
+
+            // Validate the data
+            $validator = Validator::make($request->data,[
+                'salon_id' => ['required','numeric','min:1'],
+                'treatment_id' => ['required','numeric','min:1'],
+                'user_id' => ['required','numeric','min:1'],
+                'appointment_id' =>  ['required','numeric','min:1'],
+                'date' => ['required','date'],
+                'timeslot' => ['required'],
+            ]);
+            
+            //check validation
+            if( $validator->fails() ){
+                $output = ['status' => 'error','status_type' => false,'status_code'=>400,'message'=> $validator->errors()->first() ,'data' => null];
+                return response()->json($output);            
+            }
+
+            DB::beginTransaction();
+
+            $appointment = Appointment::find($request->data['appointment_id']);
+            TimeSchedule::where('therapist_id', '=' ,$appointment->therapist_id)
+                ->where('slot_date', '=', $appointment->appointment_date)
+                ->where('slot_time','=', $appointment->appointment_time)
+                ->update(['flag' => 'A','modified_date' => Carbon::now(), 'modified_by' => $request->data['user_id'] ]);
+            
+            $appointment->treatment_id = $request->data['treatment_id'];
+            $appointment->appointment_date = $request->data['date'];
+            $appointment->appointment_time = $request->data['timeslot'];
+            $appointment->modified_date = Carbon::now();
+            $appointment->modified_by = $request->data['user_id'];
+            $appointment->therapist_name = isset($request->data['therapist_name'])? $request->data['therapist_name'] : null;
+            $appointment->therapist_id = isset($request->data['therapist_id'])? $request->data['therapist_id'] : null;
+            $appointment->save();
+            $appointment->appointment_id = $appointment->id;
+            $selon_setup = SalonSetup::findOrFail($request->data['salon_id']);
+            $customer = CustomerRegistration::findOrFail($request->data['user_id']);
+            $this->updateBookingStatus($request->data,$selon_setup,$customer);
+            DB::commit();
+
+            $message = 'Appointment Change Successfully.';
+            try{
+                $this->sendChangeAppointmentlMail($appointment, $customer, 'Change Appointment');
+            }catch(Exception $e){
+                $message .='But mail is not sent';
+            }
+
+            $output = ['status' => 'success','status_type' => true,'status_code'=>200,'message'=> $message ,'data' => $appointment ];
+            return response()->json($output);
+
+        }catch(Exception $ex){
+            DB::rollBack();
+            $output = ['status' => 'error','status_type' => false,'status_code'=>500,'message'=> 'Something went wrong' ,'data' => null];
+            return response()->json($output);
+        }
+    }
+
+
+    // send Appointment Cancel Mail
+    protected function sendCancelMail($appointment, $customer, $sublect){
+        $salon_register = SalonRegistration::where('salon_register_id','=', $appointment->salon_id)
+            ->select('id','email','phone_number','full_name')->get();
+        
+        $customer_message = 'Hi '.$customer->full_name.'<br>'.' Your Appointment Date: '.$appointment->appointment_date.
+        ', at :'.$appointment->appointment_time. ' been cancel Successfully. Thank You!';
+
+        $this->sendMail($customer->email, $customer_message, $sublect);
+        
+        foreach($salon_register as $salon_reg){
+            $salon_message = "Hi ".$salon_reg->full_name.' Your customer '. $customer->full_name.' Canceled his Appoinement on : '.
+            $appointment->appointment_date.' at '.$appointment->appointment_time;
+            $this->sendMail($salon_reg->email,$salon_message, $sublect);
+        }        
+    }
+
+    // send Appointment Cancel Mail
+    protected function sendChangeAppointmentlMail($appointment, $customer, $sublect){
+        $salon_register = SalonRegistration::where('salon_register_id','=', $appointment->salon_id)
+            ->select('id','email','phone_number','full_name')->get();
+        $treatment = TreatmentList::findorFail($appointment->treatment_id);
+        
+        $customer_message = 'Hi '.$customer->full_name.'<br>'.'Your booking has been changed'.
+        'Thank you for booking a '.$treatment->treatment_name .' on '.$appointment->appointment_date.' at '.$appointment->appointment_time.'.It\'s been confirmed. Thank You!';
+
+        $this->sendMail($customer->email, $customer_message, $sublect);
+        
+        foreach($salon_register as $salon_reg){
+            $salon_message = "Hi ".$salon_reg->full_name.' Your customer '. $customer->full_name.' changed his appointment. New booked appoinment on '.$treatment->treatment_name.
+            ' on '.$appointment->appointment_date.' at '.$appointment->appointment_time.'. It\'s been confirmed. Thank You!';
+            $this->sendMail($salon_reg->email,$salon_message, $sublect);
+        }        
     }
 }
