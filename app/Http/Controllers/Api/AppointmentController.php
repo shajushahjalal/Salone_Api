@@ -514,6 +514,7 @@ class AppointmentController extends Controller
             DB::beginTransaction();
 
             $appointment = Appointment::find($request->data['appointment_id']);
+            $time_slot = $this->getSlotTime($request->data['timeslot']);
 
             TimeSchedule::where('therapist_id', '=' ,$appointment->therapist_id)
                 ->where('slot_date', '=', $appointment->appointment_date)
@@ -523,6 +524,8 @@ class AppointmentController extends Controller
             $appointment->treatment_id = $request->data['treatment_id'];
             $appointment->appointment_date = $request->data['date'];
             $appointment->appointment_time = $request->data['timeslot'];
+            $appointment->start_time = str_replace(' ','', $time_slot[0] );
+            $appointment->end_time = str_replace(' ','', $time_slot[1] );
             $appointment->modified_date = Carbon::now();
             $appointment->modified_by = $request->data['user_id'];
             $appointment->therapist_name = isset($request->data['therapist_name'])? $request->data['therapist_name'] : null;
