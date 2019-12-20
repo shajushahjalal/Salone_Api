@@ -14,7 +14,7 @@ use Carbon\Carbon;
 use Exception;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Facades\DB;
-use Mail;
+use Illuminate\Support\Facades\Mail;
 
 class AppointmentController extends Controller
 {
@@ -229,8 +229,10 @@ class AppointmentController extends Controller
             $appointment = new Appointment();
             $selon_setup = SalonSetup::findOrFail($request->data['salon_id']);
             $customer = CustomerRegistration::findOrFail($request->data['user_id']);
-            $this->makeAppoinrment($appointment, $request->data);
-            $this->updateBookingStatus($request->data,$selon_setup,$customer);
+            $appoint_id = $this->getAppointId();
+
+            $this->makeAppoinrment($appointment, $request->data, $appoint_id);
+            $this->updateBookingStatus($request->data, $selon_setup, $customer, $appoint_id);
             DB::commit();
             $message = "Your Appointment Confirm Successfully.";
             try{
@@ -249,9 +251,11 @@ class AppointmentController extends Controller
     }
 
     // Make Appointment 
-    protected function makeAppoinrment($appointment, $data){
+    protected function makeAppoinrment($appointment, $data, $appoint_id){
         $appointment->client_id = $data['user_id'];
         $appointment->salon_id  = $data['salon_id'];
+        $time_slot = $this->getSlotTime($data['timeslot']);
+
         if(isset($data['therapist_name'])){
             $appointment->therapist_name = $data['therapist_name'];
         }else{
@@ -264,18 +268,39 @@ class AppointmentController extends Controller
         $appointment->appointment_date = $data['date'];
         $appointment->appointment_time = $data['timeslot'];
         $appointment->status = '1';
-        $appointment->create_date = Carbon::now();
+        $appointment->create_date = Carbon::now();        
+        $appointment->start_time = str_replace(' ','', $time_slot[0] );
+        $appointment->end_time = str_replace(' ','', $time_slot[1] );
+        $appointment->appoint_id = $appoint_id;
         $appointment->save();
         return $appointment;
     }
 
+    // Get Time Slot Array
+    protected function getSlotTime($time_slot){
+        $time = explode('-', $time_slot);
+        return $time;
+    }
+
+    // Get Appoint ID
+    protected function getAppointId(){
+        $data = Appointment::orderBy('id','desc')->first();
+        if( empty($data) ){
+            return 1;
+        }
+        return ($data->id + 1);
+    }
+
     // Update Appointment Bookng Status
-    protected function updateBookingStatus($data, $salon_setup, $customer){        
+    protected function updateBookingStatus($data, $salon_setup, $customer, $appoint_id){        
         TimeSchedule::where('therapist_id', $data['therapist_id'] )
             ->where('slot_time', $data['timeslot'] )
             ->where('slot_date', $data['date'] )
             ->where('salon_register_id',$salon_setup->salon_register_id)
-            ->update(['flag' => 'B','modified_date' => Carbon::now(), 'modified_by' => $customer->id ]);
+            ->update([
+                'flag' => 'B','modified_date' => Carbon::now(), 
+                'modified_by' => $customer->id, 'appoint_id' => $appoint_id
+            ]);
     }
 
     // Send Appointment Confirmation Mail
@@ -489,10 +514,11 @@ class AppointmentController extends Controller
             DB::beginTransaction();
 
             $appointment = Appointment::find($request->data['appointment_id']);
+
             TimeSchedule::where('therapist_id', '=' ,$appointment->therapist_id)
                 ->where('slot_date', '=', $appointment->appointment_date)
                 ->where('slot_time','=', $appointment->appointment_time)
-                ->update(['flag' => 'A','modified_date' => Carbon::now(), 'modified_by' => $request->data['user_id'] ]);
+                ->update(['flag' => 'A', 'appoint_id' => Null, 'modified_date' => Carbon::now(), 'modified_by' => $request->data['user_id'] ]);
             
             $appointment->treatment_id = $request->data['treatment_id'];
             $appointment->appointment_date = $request->data['date'];
@@ -503,9 +529,10 @@ class AppointmentController extends Controller
             $appointment->therapist_id = isset($request->data['therapist_id'])? $request->data['therapist_id'] : null;
             $appointment->save();
             $appointment->appointment_id = $appointment->id;
+
             $selon_setup = SalonSetup::findOrFail($request->data['salon_id']);
             $customer = CustomerRegistration::findOrFail($request->data['user_id']);
-            $this->updateBookingStatus($request->data,$selon_setup,$customer);
+            $this->updateBookingStatus($request->data, $selon_setup, $customer, $appointment->appoint_id );
             DB::commit();
 
             $message = 'Appointment Change Successfully.';
