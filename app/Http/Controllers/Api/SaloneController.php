@@ -23,6 +23,7 @@ class SaloneController extends Controller
                     ->leftjoin('salon_registration','salon_setup.salon_register_id','=','salon_registration.id')
                     ->leftjoin('closing_day','closing_day.salon_register_id','=','salon_setup.salon_register_id')
                     ->where('salon_setup.salon_status','=',1)
+                    ->where('salon_registration.salon_status','=',1)
                     ->select('salon_setup.*','salon_registration.full_name as salon_name','closing_day')->get();
             foreach($salons as $salon){                
                 $salon->salon_logo = $salon->salon_logo_path;
